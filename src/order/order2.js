@@ -6,7 +6,7 @@ const sqlite3 = require('sqlite3').verbose(); // 4) Import sqlite3 module for da
 const NodeCache = require('node-cache'); // 5) Import node-cache for caching
 const db = new sqlite3.Database('database.db'); // Create sqlite3 database instance
 const app = express(); // Create express app
-const port = 5000; // The port for the order server is 5000
+const port = 5001; // The port for the order server is 5000
 
 // Initialize cache with a time-to-live of 20 minutes
 const cache = new NodeCache({ stdTTL: 1200, checkperiod: 120 });

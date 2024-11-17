@@ -1,51 +1,77 @@
-//import the require modules 
-const express = require('express');          //1)import express module for bulding servers
-const http =require('http');                 //2)import http module for http req
-const axios = require('axios');              //3) import axios module for req also
-const app = express();                       // create express app
-const port= 3000;                           // the port for front end server is 3000
+// Import the required modules
+const express = require('express');          // Express module for building servers
+const http = require('http');                // HTTP module for HTTP requests
+const axios = require('axios');              // Axios module for HTTP requests
+const app = express();                       // Create express app
+const port = 3000;                           // Frontend server runs on port 3000
 
-app.get('/search/:topic',(req,res)=>{       // if the req is search req route it based on topic
-    try {
-    http.get('http://catalog:4000/search/'+req.params.topic,( response)=>{         // get req to the catalog server to return the item
-        response.on("data", (chunk)=>{
-            const responseData = JSON.parse(chunk);                                  // parse to json format
-            res.json(responseData)                                                   // return the response from catalog server
-            console.log('Fetched successfully');
-            console.log(responseData);
-        });     
-})
-    }catch (error) {                                                                
-        res.status(500).json({ error: error.message });                             // handle error if found
-    }
-})
-app.get('/info/:item_number',(req,res)=>{                                           // if the req is info req route it based on item number          
-    try {
-    http.get('http://catalog:4000/info/'+req.params.item_number,(response)=>{     // get req to the catalog server to return the information about the item
-        response.on("data", (chunk)=>{
-            const responseData = JSON.parse(chunk);
-            res.json(responseData)
-            console.log('Fetched successfully');
-            console.log(responseData);
-        });   
-})
-}catch (error) {
-    res.status(500).json({ error: error.message });                                //another handling 
+// Replica servers for catalog and order
+const catalogReplicas = ["http://catalog:4000", "http://catalog2:4001"];
+const orderReplicas = ["http://order:5000", "http://order2:5001"];
+
+// Indexes for round-robin load balancing
+let catalogIndex = 0;
+let orderIndex = 0;
+
+// Round-robin function
+function getNextReplica(replicas, currentIndex) {
+    const replica = replicas[currentIndex];
+    const nextIndex = (currentIndex + 1) % replicas.length; // Move to the next replica
+    return { replica, nextIndex };
 }
 
-})
+// Handle search requests (Catalog load balancing)
+app.get('/search/:topic', (req, res) => {
+    const { replica, nextIndex } = getNextReplica(catalogReplicas, catalogIndex);
+    catalogIndex = nextIndex; // Update catalog index for the next request
 
-app.post('/purchase/:item_number', async (req,res)=>{                                                       // if the req is purchase req route it based on item number     
     try {
-        const response = await axios.post(`http://order:5000/purchase/${req.params.item_number}`);      // make an http post req to order server using axios
-        console.log('Orderd successfully');
+        http.get(`${replica}/search/${req.params.topic}`, (response) => { // Forward to a replica
+            response.on("data", (chunk) => {
+                const responseData = JSON.parse(chunk); // Parse response to JSON
+                res.json(responseData); // Send the response to the client
+                console.log(responseData);
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message }); // Handle errors
+    }
+});
+
+// Handle info requests (Catalog load balancing)
+app.get('/info/:item_number', (req, res) => {
+    const { replica, nextIndex } = getNextReplica(catalogReplicas, catalogIndex);
+    catalogIndex = nextIndex; // Update catalog index for the next request
+
+    try {
+        http.get(`${replica}/info/${req.params.item_number}`, (response) => { // Forward to a replica
+            response.on("data", (chunk) => {
+                const responseData = JSON.parse(chunk);
+                res.json(responseData);
+                console.log(responseData);
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message }); // Handle errors
+    }
+});
+
+// Handle purchase requests (Order load balancing)
+app.post('/purchase/:item_number', async (req, res) => {
+    const { replica, nextIndex } = getNextReplica(orderReplicas, orderIndex);
+    orderIndex = nextIndex; // Update order index for the next request
+
+    try {
+        const response = await axios.post(`${replica}/purchase/${req.params.item_number}`); // Forward to a replica
+        console.log('Ordered successfully');
         console.log(response.data);
         res.json(response.data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: error.message }); // Handle errors
     }
- 
-})
-app.listen(port,()=>{                                                             // start the front end server
-    console.log("Front end server is running at 3000");
-})
+});
+
+// Start the frontend server
+app.listen(port, () => {
+    console.log(`Front end server is running at ${port}`);
+});

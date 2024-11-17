@@ -5,7 +5,7 @@ const NodeCache = require('node-cache'); // Import NodeCache for in-memory cachi
 
 const app = express(); // Create express app
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600, maxKeys: 100 }); // Cache with a 1-hour TTL
-const port = 4000; // The port for the front-end server is 4000
+const port = 4001; // The port for the front-end server is 4000
 
 app.use(express.json()); // Middleware to parse incoming JSON data
 
@@ -52,12 +52,13 @@ app.get('/info/:item_number', (req, res) => {
       res.status(500).send('Error fetching data from database'); // Error handling
     } else {
       cache.set(item_number, data); // Cache the result
-      console.log('Fetched successfully and cached (catalog1)');
+      console.log('Fetched successfully and cached');
       console.log(data);
       res.json(data); // If success, send the data as JSON
     }
   });
 });
+
 
 // Update stock and invalidate cache
 app.put('/update/:item_number', (req, res) => {
@@ -79,12 +80,12 @@ app.put('/update/:item_number', (req, res) => {
       });
 
       console.log('Cache invalidated for item:', item_number);
-      res.status(200).send('Stock updated and cache invalidated');
+      res.status(200).send('Stock updated and cache invalidated (catalog2)');
     }
   });
 });
 
 // Start the catalog server
 app.listen(port, () => {
-  console.log('Catalog server is running at 4000');
+  console.log('Catalog server is running at 4001');
 });
